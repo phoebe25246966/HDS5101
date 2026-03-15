@@ -1,0 +1,471 @@
+---
+title: "HDS5101"
+author: "Phoebe Wong Hui Lei"
+date: "2026-03-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+*Goal of the task* : 
+Find the best model in discriminating individuals with or without heart disease by evaluating the brier score, area under the ROC curve and calibration curve. 
+
+*Source of dataset*: https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data
+
+*Study population*: Records collected from Cleveland Clinic Foundation
+
+*Procedure*: 
+1) Explore the missing variable in the dataset
+2) Apply single imputation on the dataset
+3) Split the train and test dataset with 70% and 30% proportions.
+4) Apply models like Generalise Linear Model(GLM),ridge regression,lasso regression, Linear Discriminant Analysis(LDA), Naive Bayes(NB) and Trees select the best model.
+
+*Outcome of the study* :  
+Presence of heart disease in the patient. The original variable ranges from 0 to 4, representing different levels of heart disease severity. For this study, the outcome variable will be converted into a binary variable where 0 indicates absence of heart disease and values 1–4 indicate presence of heart disease
+
+
+# Load library
+```{r}
+library(dplyr)
+library(mice)
+library(VIM)
+library(pROC)
+library(CalibrationCurves)
+library(glmnet)
+library(MASS)
+library(e1071)
+library(GGally)
+library(pls)
+library(tree)
+
+```
+
+
+```{r}
+url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+
+cleveland <- read.table(url, sep = ",", header = FALSE)
+
+colnames(cleveland)<-c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","num")
+
+head(cleveland)
+```
+
+```{r}
+library(naniar)
+
+cleveland <- cleveland %>%
+  replace_with_na_all(condition = ~.x =="?")
+
+#check for null value
+na_count <- colSums(is.na(cleveland))
+na_count
+```
+
+# Convert multi-category to binary form
+```{r}
+cleveland <- cleveland %>% 
+  mutate(
+    heart_disease = factor(ifelse(num >= 1, 1, 0),levels = c(0,1))
+  )
+
+cleveland %>%
+  count(heart_disease)
+```
+
+
+# Visualization of Missing Data
+```{r}
+md.pattern(cleveland, rotate.names=TRUE)
+```
+
+```{r}
+aggr(cleveland)
+```
+
+# Imputation
+```{r}
+cleveland.to.impute<- cleveland %>%
+  dplyr::select(-num)%>%
+  mutate(
+    thal = factor(thal),
+    ca = factor(ca)
+  )
+
+# use polyreg since there are more than 2 levels of factor
+cleveland.impute <- mice(data=cleveland.to.impute,m=10,method=c("","","","","","","","","","","","polyreg","polyreg",""), seed=100, print=FALSE)
+```
+
+```{r}
+plot(cleveland.impute)
+```
+
+
+```{r}
+#pick the 5th imputed dataset
+cleveland_imputed <- complete(cleveland.impute,action=5)
+```
+
+# Data Visualization on the outcome
+```{r}
+ggplot(cleveland_imputed, aes(x = heart_disease,fill=heart_disease)) +
+  geom_bar()+labs(
+    x="Heart disease",
+    y="Count",
+    title="Distribution of heart disease"
+  )
+```
+
+The barplot above shows a distribution of outcome variable determining whether an individual has heart disease or not. It shows that number of observations for individuals without heart disease slightly higher than those with.
+
+# Check for correlation among the continuous predictor
+```{r}
+con_cleveland_imputed <- cleveland_imputed %>%
+  dplyr::select(-c(ca,thal,heart_disease))
+
+ggcorr(con_cleveland_imputed,label = TRUE)
+```
+Based on the correlation heatmap shows that most numeric variables have low and moderate correlations. It suggest that there is less risk of multicollinearity.The strongest correlation is between oldpeak and slope of 0.6.
+
+# Split the dataset into train and test
+```{r}
+# set the dataset to be split on 70% as train
+set.seed(100)
+
+hd <- cleveland_imputed$heart_disease
+n <- nrow(cleveland_imputed)
+train <- runif(n)< 0.7
+train.hd <- cleveland_imputed[train,]
+test.hd <- cleveland_imputed[!train,]
+dim(test.hd)
+hd.test <- hd[!train]
+```
+## Brier score function
+```{r}
+brier_score <- function(y, pred_prob) {
+  mean((y - pred_prob)^2)
+}
+
+```
+
+
+# GLM fit 
+```{r}
+glm.fits <- glm(heart_disease ~ .,data = train.hd, family = binomial)
+
+glm.probs <- predict(glm.fits,newdata=test.hd,type = "response") ## predict probabilities in the test set
+```
+
+## Brier score
+```{r}
+brier_test_glm <- brier_score(as.numeric(hd.test) - 1, glm.probs)
+brier_test_glm
+```
+The brier score of fitted generalized linear model is 0.1096.
+
+## ROC curve
+```{r}
+roc_obj_glm <- roc(as.numeric(hd.test) - 1, glm.probs)
+plot(roc_obj_glm, print.auc=TRUE)
+```
+
+In the ROC curve, it has shown the trade off between correctly identifying patients with heart disease(TP) and incorrectly identifying patients having heart disease as they do not(FP). 
+
+The AUC shows an overall measure of model discrimination between individuals with and without heart disease. An AUC with value of 0.916 indicates well discrimination.When randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 91.6% of the time.
+
+
+## Calibration curve
+```{r}
+valProbggplot(glm.probs, as.numeric(hd.test)-1)
+```
+
+The slope of the calibration curve is 0.96 and intercept of the curve is 0.31, shows that there is a minor deviation from the perfect calibration line. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+
+# Ridge regression
+```{r}
+set.seed(100)
+
+x <- model.matrix(heart_disease ~ ., cleveland_imputed)[, -1]
+y <- cleveland_imputed$heart_disease
+
+ridge.mod<-glmnet(x[train,], y[train], alpha = 0, family = binomial)
+
+cv.out <- cv.glmnet(x[train, ], y[train], alpha = 0, family = binomial)
+plot(cv.out)
+
+bestlam <- cv.out$lambda.min
+bestlam
+
+ridge.probs <- predict(ridge.mod, s = bestlam,newx = x[!train, ], type = "response")
+
+```
+The lambda chosen for the ridge regression is 0.0472.
+
+## Brier score
+```{r}
+brier_test_ridge <- brier_score(as.numeric(hd.test) - 1, ridge.probs)
+brier_test_ridge
+```
+The brier score of ridge regression model is 0.1068.
+
+## ROC curve
+```{r}
+roc_obj_ridge <- roc(as.numeric(hd.test) - 1, ridge.probs[,1])
+plot(roc_obj_ridge, print.auc=TRUE)
+```
+
+An AUC with value of 0.930 indicates better discrimination as compared to the glm.When randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 93% of the time.
+
+
+## Calibration curve
+```{r}
+valProbggplot(ridge.probs[,1], as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 1.49 and intercept of the curve is 0.24. The predicted probabilities are too narrow that shrunk toward the mean.
+
+# Lasso Regression
+
+```{r}
+set.seed(100)
+lasso.mod <- glmnet(x[train, ], y[train], alpha = 1, family = binomial)
+cv.out_lasso <- cv.glmnet(x[train, ], y[train], alpha = 1, family = binomial)
+plot(cv.out_lasso)
+
+bestlam_lasso <- cv.out$lambda.min
+bestlam_lasso 
+
+lasso.probs <- predict(lasso.mod, s = bestlam_lasso,newx = x[!train, ], type = "response")
+# check the selected features in lasso 
+
+lasso.coefs <- predict(lasso.mod, s = bestlam_lasso, type = "coefficients")[1:15,]
+lasso.coefs
+```
+
+```{r}
+lasso.coefs[lasso.coefs!=0]
+```
+It has shown that applying ridge regression on the dataset,the model has excluded four variables, which are age 
+
+## Brier score
+```{r}
+brier_test_lasso <- brier_score(as.numeric(hd.test) - 1, lasso.probs)
+brier_test_lasso
+```
+The brier score of lasso regression model is 0.1294.
+
+## ROC curve
+```{r}
+roc_obj_lasso <- roc(as.numeric(hd.test) - 1, lasso.probs[,1])
+plot(roc_obj_lasso, print.auc=TRUE)
+```
+
+An AUC with value of 0.905 indicates when randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 90.5% of the time. As a comparison with AUC from glm and ridge regression, it has weaker predictive capability. 
+
+## Calibration curve
+```{r}
+valProbggplot(lasso.probs[,1], as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 1.79 and intercept of the curve is 0.23. The predicted probabilities are too narrow that shrunk toward the mean, which is similar case as ridge regression.
+
+# LDA - Linear Discriminant Analysis
+```{r}
+set.seed(100)
+lda.fit <- lda(heart_disease ~ ., data = train.hd)
+lda.fit
+
+lda.pred <- predict(lda.fit,newdata=test.hd)
+lda.pred.probs <- lda.pred$posterior[, 2]
+```
+Based on the prior probabilities of group 0 and 1, it has 0.5571 and 0.4429 respectively. It indicates that there are 44.29% individuals have heart disease in training dataset.
+
+The coefficients of linear discriminant indicates that variable such as sex,cp,trestbps,chol,restecg,exang,oldpeak,slope,ca and thal have positive coefficienys, suggesting that higher values of these variable contribute positively to the discriminant score and associate with higher likelihood of heart disease.
+
+
+## Brier score
+```{r}
+brier_test_lda <- brier_score(as.numeric(hd.test) - 1, lda.pred.probs)
+brier_test_lda
+```
+The brier score of lda model is 0.1084.
+
+## ROC curve
+```{r}
+roc_obj_lda <- roc(as.numeric(hd.test) - 1, lda.pred.probs)
+plot(roc_obj_lda, print.auc=TRUE)
+```
+
+An AUC with value of 0.916 indicates when randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 91.6% of the time.
+
+## Calibration curve
+```{r}
+valProbggplot(lda.pred.probs, as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 0.80 and intercept of the curve is 0.49. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+
+
+# Naive Bayes
+```{r}
+set.seed(100)
+nb.fit <- naiveBayes(heart_disease ~ ., data = train.hd)
+nb.fit
+nb.preds <- predict(nb.fit, test.hd, type = "raw")
+```
+In the Naive Bayes model, it shows the mean and standard deviation of all covariates when heart disease is either 0 or 1.
+
+## Brier Score
+```{r}
+brier_test_nb<- brier_score(as.numeric(hd.test) - 1, nb.preds[,2])
+brier_test_nb
+```
+The brier score of naive bayes model is 0.1111.
+
+## ROC curve
+```{r}
+roc_obj_nb <- roc(as.numeric(hd.test) - 1, nb.preds[,2])
+plot(roc_obj_nb, print.auc=TRUE)
+```
+An AUC with value of 0.932 indicates when randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 93.2% of the time.
+
+## Calibration curve
+```{r}
+valProbggplot(nb.preds[,2], as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 0.52 and intercept of the curve is 0.69, shows that substantial deviation from the prefect calibration line. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+
+# Trees
+```{r}
+set.seed(100)
+tree.fit <- tree(heart_disease ~ ., data = train.hd)
+summary(tree.fit)
+```
+It shows that the training misclassification error rate is 9.05%.
+
+
+```{r}
+plot(tree.fit)
+text(tree.fit,pretty = 0)
+```
+It shows that the most important indicator of 'heart disease' is cp, since the first branch differentiates between individuals with cp<3.5 and cp>=3.5
+
+**Pruning the tree**
+```{r}
+set.seed(10)
+cv_tree <- cv.tree(tree.fit,FUN = prune.misclass)
+cv_tree
+```
+The tree model with 11 terminal nodes results in the minimum,41 cross validation errors.
+
+```{r}
+par(mfrow = c(1, 2))
+plot(cv_tree$size, cv_tree$dev, type = "b")
+plot(cv_tree$k, cv_tree$dev, type = "b")
+```
+```{r}
+prune.tree <- prune.misclass(tree.fit, best = 11)
+plot(prune.tree)
+text(prune.tree, pretty = 0)
+```
+```{r}
+tree.preds <- predict(prune.tree,newdata = test.hd)[,2]
+```
+
+
+
+## Brier Score
+```{r}
+brier_test_tree<- brier_score(as.numeric(hd.test) - 1, tree.preds)
+brier_test_tree
+```
+The brier score of naive bayes model is 0.1814.
+
+## ROC curve
+```{r}
+roc_obj_tree <- roc(as.numeric(hd.test) - 1, tree.preds)
+plot(roc_obj_tree, print.auc=TRUE)
+```
+An AUC with value of 0.932 indicates when randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 93.2% of the time.
+
+## Calibration curve
+```{r}
+valProbggplot(tree.preds, as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 0.69 and intercept of the curve is 0.31, shows that substantial deviation from the prefect calibration line. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+
+
+# Comparison of models performance on brier score and the AUC score
+```{r}
+comparison <- data.frame(
+  brier = c(
+    glm=brier_test_glm,
+    ridge=brier_test_ridge,
+    lasso=brier_test_lasso,
+    lda=brier_test_lda,
+    nb=brier_test_nb,
+    tree=brier_test_tree
+    
+  ),
+  auc = c(
+    glm=roc_obj_glm$auc,
+    ridge=roc_obj_ridge$auc,
+    lasso=roc_obj_lasso$auc,
+    lda=roc_obj_lda$auc,
+    nb=roc_obj_nb$auc,
+    tree=roc_obj_tree$auc
+  )
+)
+round(comparison,4)
+```
+Ridge regression and naive bayes (NB) has similar overall performance. Ridge regression has the lowest brier score of 0.1096, indicating a slightly better calibration. While naive bayes(NB) achieves the highest AUC score of 0.9320. Since the differences are minimal in both models, suggesting both models yield equivalent performance in heart disease prediction.
+
+
+# Comparison on the roc curve for models
+```{r}
+    roc_glm=data.frame(
+      model="glm",
+      spec=roc_obj_glm$specificities,
+      sens=roc_obj_glm$sensitivities
+      )
+    roc_ridge=data.frame(
+      model="ridge",
+      spec=roc_obj_ridge$specificities,
+      sens=roc_obj_ridge$sensitivities
+      )
+    roc_lasso=data.frame(
+      model="lasso",
+      spec=roc_obj_lasso$specificities,
+      sens=roc_obj_lasso$sensitivities
+    )
+    roc_lda=data.frame(
+      model="lda",
+      spec=roc_obj_lda$specificities,
+      sens=roc_obj_lda$sensitivities
+      )
+    roc_nb=data.frame(
+      model="nb",
+      spec=roc_obj_nb$specificities,
+      sens=roc_obj_nb$sensitivities
+    )
+    roc_tree=data.frame(
+      model="tree",
+      spec=roc_obj_tree$specificities,
+      sens=roc_obj_tree$sensitivities
+    )
+
+roc_df <- rbind(roc_glm,roc_ridge,roc_lasso,roc_lda,roc_nb,roc_tree)
+  
+ggplot(data=roc_df,aes(x=1-spec,y=sens,color=model))+
+  geom_line(size=1.0)+
+  geom_abline(linetype = "dashed") +
+  theme_minimal()+labs(
+    x="1-Specificity",
+    y="Sensitivity",
+    title="ROC curve comparison"
+  )
+```
+
+The ploty shows the ROC curve comparison, indicating the naive bayes(NB) and ridge regression model exhibits similar performance.

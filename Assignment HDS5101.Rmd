@@ -438,7 +438,8 @@ comparison <- data.frame(
     lasso=brier_test_lasso,
     lda=brier_test_lda,
     nb=brier_test_nb,
-    tree=brier_test_tree
+    tree=brier_test_tree,
+    random_forest=brier_test_bag
     
   ),
   auc = c(
@@ -447,7 +448,8 @@ comparison <- data.frame(
     lasso=roc_obj_lasso$auc,
     lda=roc_obj_lda$auc,
     nb=roc_obj_nb$auc,
-    tree=roc_obj_tree$auc
+    tree=roc_obj_tree$auc,
+    random_forest=roc_obj_bag$auc
   )
 )
 round(comparison,4)
@@ -487,8 +489,13 @@ Ridge regression and naive bayes (NB) has similar overall performance. Ridge reg
       spec=roc_obj_tree$specificities,
       sens=roc_obj_tree$sensitivities
     )
+  roc_bag = data.frame(
+      model="random forest",
+      spec=roc_obj_bag$specificities,
+      sens=roc_obj_bag$sensitivities
+    )
 
-roc_df <- rbind(roc_glm,roc_ridge,roc_lasso,roc_lda,roc_nb,roc_tree)
+roc_df <- rbind(roc_glm,roc_ridge,roc_lasso,roc_lda,roc_nb,roc_tree,roc_bag)
   
 ggplot(data=roc_df,aes(x=1-spec,y=sens,color=model))+
   geom_line(size=1.0)+
@@ -500,4 +507,4 @@ ggplot(data=roc_df,aes(x=1-spec,y=sens,color=model))+
   )
 ```
 
-The ploty shows the ROC curve comparison, indicating the naive bayes(NB) and ridge regression model exhibits similar performance.
+The plot shows the ROC curve comparison, indicating the naive bayes(NB) and ridge regression model exhibits similar performance.

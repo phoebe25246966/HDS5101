@@ -20,10 +20,12 @@ Find the best model in discriminating individuals with or without heart disease 
 *Study population*: Records collected from Cleveland Clinic Foundation
 
 *Procedure*: 
-1) Explore the missing variable in the dataset
-2) Apply single imputation on the dataset
-3) Split the train and test dataset with 70% and 30% proportions.
-4) Apply models like Generalise Linear Model(GLM),ridge regression,lasso regression, Linear Discriminant Analysis(LDA), Naive Bayes(NB) and Trees select the best model.
+1) Assess the missing variables in the dataset, and the extent of missingness
+2) Apply single imputation technique to handle missing data, and create complete dataset for analysis
+3) Evaluate differences between complete case dataset and the imputed dataset to assess the impact of imputation 
+4) Randomly split the dataset into 70% of train and 30% of test for model development 
+5) Fit multiple predictive models on the train dataset and perform prediction on the test dataset
+6) Make comparison on models performance using metrics such as Brier score and AUC. Visualize the ROC curve for comparison on the classification accuracy
 
 *Outcome of the study* :  
 Presence of heart disease in the patient. The original variable ranges from 0 to 4, representing different levels of heart disease severity. For this study, the outcome variable will be converted into a binary variable where 0 indicates absence of heart disease and values 1–4 indicate presence of heart disease

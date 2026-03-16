@@ -20,10 +20,12 @@ Find the best model in discriminating individuals with or without heart disease 
 *Study population*: Records collected from Cleveland Clinic Foundation
 
 *Procedure*: 
-1) Explore the missing variable in the dataset
-2) Apply single imputation on the dataset
-3) Split the train and test dataset with 70% and 30% proportions.
-4) Apply models like Generalise Linear Model(GLM),ridge regression,lasso regression, Linear Discriminant Analysis(LDA), Naive Bayes(NB) and Trees select the best model.
+1) Assess the missing variables in the dataset, and the extent of missingness
+2) Apply single imputation technique to handle missing data, and create complete dataset for analysis
+3) Evaluate differences between complete case dataset and the imputed dataset to assess the impact of imputation 
+4) Randomly split the dataset into 70% of train and 30% of test for model development 
+5) Fit multiple predictive models on the train dataset and perform prediction on the test dataset
+6) Make comparison on models performance using metrics such as Brier score and AUC. Visualize the ROC curve for comparison on the classification accuracy
 
 *Outcome of the study* :  
 Presence of heart disease in the patient. The original variable ranges from 0 to 4, representing different levels of heart disease severity. For this study, the outcome variable will be converted into a binary variable where 0 indicates absence of heart disease and values 1–4 indicate presence of heart disease
@@ -395,6 +397,36 @@ An AUC with value of 0.932 indicates when randomly select an individual with hea
 valProbggplot(tree.preds, as.numeric(hd.test)-1)
 ```
 The slope of the calibration curve is 0.69 and intercept of the curve is 0.31, shows that substantial deviation from the prefect calibration line. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+
+# Random Forest
+```{r}
+set.seed(100)
+bag.fit<- randomForest(heart_disease ~ ., data = train.hd, mtry = 13, importance = TRUE)
+bag.fit
+
+yhat.bag <- predict(bag.fit,newdata = test.hd,type="prob")[,2]
+```
+
+## Brier Score
+```{r}
+brier_test_bag<- brier_score(as.numeric(hd.test) - 1, yhat.bag)
+brier_test_bag
+```
+The brier score of naive bayes model is 0.1309.
+
+## ROC curve
+```{r}
+roc_obj_bag <- roc(as.numeric(hd.test) - 1, yhat.bag)
+plot(roc_obj_bag, print.auc=TRUE)
+```
+
+An AUC with value of 0.897 indicates when randomly select an individual with heart disease and one without heart disease,the model assigns higher predicted probability of identifying heart disease to the affected individual 89.7% of the time.
+
+## Calibration curve
+```{r}
+valProbggplot(yhat.bag, as.numeric(hd.test)-1)
+```
+The slope of the calibration curve is 0.96 and intercept of the curve is 0.23. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
 
 
 # Comparison of models performance on brier score and the AUC score

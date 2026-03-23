@@ -215,7 +215,7 @@ The AUC shows an overall measure of model discrimination between individuals wit
 valProbggplot(glm.probs.cc, as.numeric(hd_cc.test)-1)
 ```
 
-The calibration intercept of 0.27, which deviates from ideal value of 0, indicating the model is underestimating predicted probability. The slope of 1.22, which is greater than 1,suggesting the predicted probabilities are too extreme.
+The calibration intercept of 0.27, which deviates from ideal value of 0, indicating the model is underestimating predicted probability. The slope of 1.22, which is greater than 1,less than 1,suggesting the predicted probabilities are not extreme enough.
 
 # GLM fit - Imputed dataset
 
@@ -242,10 +242,11 @@ An AUC with value of 0.901 indicates the model assigns higher predicted probabil
 
 ## Calibration curve
 ```{r}
-valProbggplot(glm.probs, as.numeric(hd.test)-1)
+cali.curve.glm <- valProbggplot(glm.probs, as.numeric(hd.test)-1)
+cali.curve.glm
 ```
 
-The calibration intercept of 0.28, which deviates from ideal value of 0, indicating the model is underestimating predicted probability. The slope of 0.64, which is less than 1,suggesting the predicted probabilities are not extreme enough and compressed toward the mean
+The calibration intercept of 0.28, which deviates from ideal value of 0, indicating the model is underestimating predicted probability. The slope of 0.64, which is less than 1,suggesting that the predicted probabilities are too extreme.
 
 
 **Comparison of models performance on complete case vs imputed case **
@@ -311,9 +312,10 @@ An AUC with value of 0.920 indicates better discrimination as compared to the gl
 
 ## Calibration curve
 ```{r}
-valProbggplot(ridge.probs[,1], as.numeric(hd.test)-1)
+cali.curve.ridge<-valProbggplot(ridge.probs[,1], as.numeric(hd.test)-1)
+cali.curve.ridge
 ```
-The calibration intercept is 0.23, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 1.26, which is greater than 1, suggesting that the predicted probabilities are too extreme and not well calibrated.
+The calibration intercept is 0.23, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 1.26, which is greater than 1, suggesting that the predicted probabilities are not extreme enough.
 
 # Lasso Regression
 
@@ -356,9 +358,10 @@ An AUC with value of 0.912 indicates when randomly select an individual with hea
 
 ## Calibration curve
 ```{r}
-valProbggplot(lasso.probs[,1], as.numeric(hd.test)-1)
+cali.curve.lasso<-valProbggplot(lasso.probs[,1], as.numeric(hd.test)-1)
+cali.curve.lasso
 ```
-The calibration intercept is 0.23, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 1.15, which is greater than 1, suggesting that the predicted probabilities are too extreme and not well calibrated.
+The calibration intercept is 0.23, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 1.15, which is greater than 1, suggesting that the predicted probabilities are not extreme enough.
 
 # LDA - Linear Discriminant Analysis
 ```{r}
@@ -391,9 +394,10 @@ An AUC with value of 0.909 indicates when randomly select an individual with hea
 
 ## Calibration curve
 ```{r}
-valProbggplot(lda.pred.probs, as.numeric(hd.test)-1)
+cali.curve.lda<-valProbggplot(lda.pred.probs, as.numeric(hd.test)-1)
+cali.curve.lda
 ```
-The calibration intercept is 0.49, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.65, which is less than 1, suggesting that the predicted probabilities are not extreme enough and compressed toward the mean.
+The calibration intercept is 0.49, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.65, which is less than 1, suggesting that the predicted probabilities are too extreme.
 
 # Naive Bayes
 ```{r}
@@ -420,9 +424,10 @@ An AUC with value of 0.932 indicates when randomly select an individual with hea
 
 ## Calibration curve
 ```{r}
-valProbggplot(nb.preds[,2], as.numeric(hd.test)-1)
+cali.curve.nb <- valProbggplot(nb.preds[,2], as.numeric(hd.test)-1)
+cali.curve.nb
 ```
-The calibration intercept is 0.48, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.53, which is less than 1, suggesting that the predicted probabilities are not extreme enough and compressed toward the mean.
+The calibration intercept is 0.48, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.53, which is less than 1, suggesting that the predicted probabilities are too extreme.
 
 # Trees
 ```{r}
@@ -479,9 +484,10 @@ An AUC with value of 0.857 indicates when randomly select an individual with hea
 
 ## Calibration curve
 ```{r}
-valProbggplot(tree.preds, as.numeric(hd.test)-1)
+cali.curve.tree <- valProbggplot(tree.preds, as.numeric(hd.test)-1)
+cali.curve.tree
 ```
-The slope of the calibration curve is 0.81 and intercept of the curve is 0.83, shows that substantial deviation from the prefect calibration line. The prediction probabilities are too extreme, high predicted risks are too high and low predicted risk are too low.
+The calibration intercept is 0.83, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.81, which is less than 1, suggesting that the predicted probabilities are too extreme.
 
 # Random Forest
 ```{r}
@@ -509,36 +515,12 @@ An AUC with value of 0.888 indicates when randomly select an individual with hea
 
 ## Calibration curve
 ```{r}
-valProbggplot(yhat.bag, as.numeric(hd.test)-1)
+cali.curve.bag <- valProbggplot(yhat.bag, as.numeric(hd.test)-1)
+cali.curve.bag
 ```
-The calibration intercept is 0.24, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.92, which is less than 1, suggesting that the predicted probabilities are not sufficiently extreme and are compressed toward the mean
+The calibration intercept is 0.24, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.92, which is less than 1, suggesting that the predicted probabilities are too extreme.
 
 
-# Comparison of models performance on brier score and the AUC score
-```{r}
-comparison <- data.frame(
-  brier = c(
-    glm=brier_test_glm,
-    ridge=brier_test_ridge,
-    lasso=brier_test_lasso,
-    lda=brier_test_lda,
-    nb=brier_test_nb,
-    tree=brier_test_tree,
-    random_forest=brier_test_bag
-    
-  ),
-  auc = c(
-    glm=roc_obj_glm$auc,
-    ridge=roc_obj_ridge$auc,
-    lasso=roc_obj_lasso$auc,
-    lda=roc_obj_lda$auc,
-    nb=roc_obj_nb$auc,
-    tree=roc_obj_tree$auc,
-    random_forest=roc_obj_bag$auc
-  )
-)
-round(comparison,4)
-```
 
 
 # Comparison on the roc curve for models
@@ -575,7 +557,7 @@ round(comparison,4)
       sens=roc_obj_tree$sensitivities
     )
   roc_bag = data.frame(
-      model="random forest",
+      model="bagging",
       spec=roc_obj_bag$specificities,
       sens=roc_obj_bag$sensitivities
     )
@@ -623,5 +605,58 @@ ggplot() +
     title = "ROC Curve Comparison on Top 2 Models"
   )
 ```
+# Comparison of models performance on estimate of calibration curve,brier score and the AUC score
+```{r}
+ glm=data.frame(
+      model="glm",
+      slope=cali.curve.glm$Calibration$Slope[[1]],
+      brier=brier_test_glm,
+      auc=roc_obj_glm$auc
+      )
+  ridge=data.frame(
+      model="ridge",
+      slope=cali.curve.ridge$Calibration$Slope[[1]],
+      brier=brier_test_ridge,
+      auc=roc_obj_ridge$auc
+      )
+  lasso=data.frame(
+      model="lasso",
+      slope=cali.curve.lasso$Calibration$Slope[[1]],
+      brier=brier_test_lasso,
+      auc=roc_obj_lasso$auc
+    )
+  lda=data.frame(
+      model="lda",
+      slope=cali.curve.lda$Calibration$Slope[[1]],
+      brier=brier_test_lda,
+      auc=roc_obj_lda$auc
+      )
+  nb=data.frame(
+      model="nb",
+      slope=cali.curve.nb$Calibration$Slope[[1]],
+      brier=brier_test_nb,
+      auc=roc_obj_nb$auc
+    )
+  tree=data.frame(
+      model="tree",
+      slope=cali.curve.tree$Calibration$Slope[[1]],
+      brier=brier_test_tree,
+      auc=roc_obj_tree$auc
+    )
+  bag = data.frame(
+      model="bagging",
+      slope=cali.curve.bag$Calibration$Slope[[1]],
+      brier=brier_test_bag,
+      auc=roc_obj_bag$auc
+    )
+
+comparison_df <- rbind(glm,ridge,lasso,lda,nb,tree,bag)
+
+comparison_df
+```
+It shows that naive bayes(NB) model achieves the lowest brier score of 0.1122 and the highest AUC score of 0.9329. This indicates better discrimination and low prediction error.However, its calibration slope of 0.5277 is far from 1, suggesting a poor calibration and predict probabilities too extreme. 
+
+In fact, bagging has relative lower AUC score of 0.8883 and higher brier score of 0.1569, indicates weaker discrimination, but it yields the calibration slope of 0.9221, suggesting its predicted probabilities are more aligned with the observed outcomes.
 
 
+As a conclusion, bagging model may be preferred, where the primary objective is accuracy probability estimation. Whereas, Naive Bayes is more appropriate when the primary objective is discrimination. 

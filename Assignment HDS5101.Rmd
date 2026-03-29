@@ -45,6 +45,7 @@ library(GGally)
 library(pls)
 library(tree)
 library(randomForest)
+library(gbm)
 ```
 
 
@@ -284,13 +285,13 @@ bestlam
 
 ridge.probs <- predict(ridge.mod, s = bestlam,newx = x[!train, ], type = "response")
 
-ridge.coeffs <- predict(ridge.mod, s = bestlam,newx = x[!train, ], type = "coefficients")
+ridge.coeffs <- predict(ridge.mod, s = bestlam,newx = x[!train, ], type = "coefficients")[1:21,]
 
 ```
 The lambda chosen for the ridge regression is 0.0469.
 
 ```{r}
-ridge.coeffs[ridge.coeffs == 0]
+ridge.coeffs[ridge.coeffs != 0]
 ```
 Ridge regression includes all predictors in the model and does not perform variable selection. Although it shrinks the regression coefficients toward zero, it does not set any coefficients exactly to zero. Thus, all predictors including dummy variables for categorical variables remain in the model.
 
@@ -330,12 +331,16 @@ bestlam_lasso
 
 lasso.probs <- predict(lasso.mod, s = bestlam_lasso,newx = x[!train, ], type = "response")
 # check the selected features in lasso 
-lasso.coefs <- predict(lasso.mod, s = bestlam_lasso, type = "coefficients")
+lasso.coefs <- predict(lasso.mod, s = bestlam_lasso, type = "coefficients")[1:21,]
 ```
 The lambda chosen in lasso is 0.0199.
 
 ```{r}
 lasso.coefs[lasso.coefs != 0]
+```
+
+
+```{r}
 lasso.coefs[lasso.coefs == 0]
 ```
 LASSO regression performs variable selection by shrinking some coefficients exactly to zero. Variables with coefficients shrunk to zero are effectively excluded from the model, indicating that they contribute little to the predictive performance. The remaining variables with non-zero coefficients are considered to be informative and contribute to the model.
@@ -375,6 +380,17 @@ lda.pred.probs <- lda.pred$posterior[, 2]
 Based on the prior probabilities of group 0 and 1, it has 0.5571 and 0.4429 respectively. It indicates that there are 44.29% individuals have heart disease in training dataset.
 
 The coefficients of linear discriminant indicates that variable have positive coefficients, suggesting that higher values of these variable contribute positively to the discriminant score and associate with higher likelihood of heart disease. In this scenario, only variable age has the negative coefficients.
+
+
+```{r}
+lda_scores <- as.data.frame(lda.pred)  # discriminant coordinates
+
+ggplot(lda_scores, aes(x = LD1, fill = class)) +
+  geom_histogram(alpha = 0.7, position = "identity", bins = 20) +
+  theme_minimal() +
+  labs(title = "LDA 1D Projection", x = "LD1")
+```
+
 
 
 ## Brier score
@@ -442,7 +458,8 @@ It shows that the training misclassification error rate is 9.05%.
 plot(tree.fit)
 text(tree.fit,pretty =0,,cex=0.6)
 ```
-It shows that the most important indicator of 'heart disease' is cp, since the first branch differentiates between individuals with cp<3.5 and cp>=3.5
+Diagram above shows tree structure after pruning.
+It shows that the most important indicator of 'heart disease' is cp, since the first branch differentiates between individuals with cp ranged from 1-3.
 
 **Pruning the tree**
 ```{r}
@@ -462,6 +479,8 @@ prune.tree <- prune.misclass(tree.fit, best = 12)
 plot(prune.tree)
 text(prune.tree, pretty = 0,cex=0.6)
 ```
+Diagram above shows tree structure after pruning.
+
 ```{r}
 tree.preds <- predict(prune.tree,newdata = test.hd)[,2]
 ```
@@ -489,7 +508,7 @@ cali.curve.tree
 ```
 The calibration intercept is 0.83, which deviates from the ideal value of 0, indicating that the model systematically underestimates the predicted probabilities. The calibration slope is 0.81, which is less than 1, suggesting that the predicted probabilities are too extreme.
 
-# Random Forest
+# Bagging
 ```{r}
 set.seed(100)
 bag.fit<- randomForest(heart_disease ~ ., data = train.hd, mtry = 13, importance = TRUE)
@@ -522,16 +541,20 @@ The calibration intercept is 0.24, which deviates from the ideal value of 0, ind
 
 
 
-
 # Comparison on the roc curve for models
-**roc**
+**roc*
+
 ```{r}
     roc_glm=data.frame(
       model="glm",
       spec=roc_obj_glm$specificities,
       sens=roc_obj_glm$sensitivities
       )
-    roc_ridge=data.frame(
+```
+
+
+```{r}
+roc_ridge=data.frame(
       model="ridge",
       spec=roc_obj_ridge$specificities,
       sens=roc_obj_ridge$sensitivities
